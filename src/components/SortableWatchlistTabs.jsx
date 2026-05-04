@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Box, Typography, IconButton, Tooltip } from '@mui/material'
+import { Box, Typography, IconButton, Menu, MenuItem, ListItemIcon, ListItemText } from '@mui/material'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
+import MenuIcon from '@mui/icons-material/Menu'
 import {
   DndContext,
   closestCenter,
@@ -38,6 +39,10 @@ function FixedTab({ label, isActive, onClick }) {
 
 function SortableTab({ id, label, isActive, onClick, onDelete, onEditRequest }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  const [menuAnchor, setMenuAnchor] = useState(null)
+
+  const openMenu = (e) => { e.stopPropagation(); setMenuAnchor(e.currentTarget) }
+  const closeMenu = () => setMenuAnchor(null)
 
   return (
     <Box
@@ -62,26 +67,30 @@ function SortableTab({ id, label, isActive, onClick, onDelete, onEditRequest }) 
       <Typography sx={{ fontSize: 20, fontWeight: isActive ? 700 : 400 }}>{label}</Typography>
       {isActive && (
         <>
-          <Tooltip title="Rename">
-            <IconButton
-              size="small"
-              sx={{ color: '#666', p: 0.2, ml: 0.5, '&:hover': { color: 'primary.main' } }}
-              onClick={(e) => { e.stopPropagation(); onEditRequest() }}
-              onPointerDown={(e) => e.stopPropagation()}
-            >
-              <EditIcon sx={{ fontSize: 14 }} />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Delete list">
-            <IconButton
-              size="small"
-              sx={{ color: '#666', p: 0.2, ml: 0.5, '&:hover': { color: 'error.main' } }}
-              onClick={(e) => { e.stopPropagation(); onDelete() }}
-              onPointerDown={(e) => e.stopPropagation()}
-            >
-              <DeleteIcon sx={{ fontSize: 14 }} />
-            </IconButton>
-          </Tooltip>
+          <IconButton
+            size="small"
+            sx={{ color: '#666', p: 0.2, ml: 0.5, '&:hover': { color: 'text.primary' } }}
+            onClick={openMenu}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <MenuIcon sx={{ fontSize: 16 }} />
+          </IconButton>
+          <Menu
+            anchorEl={menuAnchor}
+            open={Boolean(menuAnchor)}
+            onClose={closeMenu}
+            onClick={(e) => e.stopPropagation()}
+            slotProps={{ paper: { sx: { minWidth: 140 } } }}
+          >
+            <MenuItem onClick={() => { closeMenu(); onEditRequest() }}>
+              <ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>
+              <ListItemText>Rename</ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => { closeMenu(); onDelete() }} sx={{ color: 'error.main' }}>
+              <ListItemIcon><DeleteIcon fontSize="small" color="error" /></ListItemIcon>
+              <ListItemText>Delete</ListItemText>
+            </MenuItem>
+          </Menu>
         </>
       )}
     </Box>

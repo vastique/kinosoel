@@ -1,15 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
-  Box, Typography, CircularProgress, ToggleButtonGroup, ToggleButton,
+  Box, Typography, CircularProgress,
   FormControl, InputLabel, Select, MenuItem, Snackbar, Alert,
   IconButton, TextField, Tooltip, Dialog, Divider, Menu,
   DialogTitle, DialogContent, DialogActions, Button,
 } from '@mui/material'
 import BookmarkIcon from '@mui/icons-material/Bookmark'
 import SortIcon from '@mui/icons-material/Sort'
-import TuneIcon from '@mui/icons-material/Tune'
-import rtIcon from '../assets/rt-icon.svg'
-import tmdbIcon from '../assets/tmdb-icon.svg'
 import AddIcon from '@mui/icons-material/Add'
 import ShareIcon from '@mui/icons-material/Share'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
@@ -35,6 +32,10 @@ export default function WatchlistPage() {
   const [renameName, setRenameName] = useState('')
   const [suggestions, setSuggestions] = useState([])
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
+  const [loadingMoreSuggestions, setLoadingMoreSuggestions] = useState(false)
+  const [hasMoreSuggestions, setHasMoreSuggestions] = useState(false)
+  const [suggestionsPage, setSuggestionsPage] = useState(1)
+  const directorIdsRef = useRef([])
   const [watchlistMap, setWatchlistMap] = useState({})
   const [sortMenuAnchor, setSortMenuAnchor] = useState(null)
   const [shareDialog, setShareDialog] = useState(false)
@@ -160,7 +161,7 @@ export default function WatchlistPage() {
   }
 
   useEffect(() => {
-    if (movies.length === 0) { setSuggestions([]); return }
+    if (movies.length === 0) { setSuggestions([]); setHasMoreSuggestions(false); return }
 
     const inWatchlist = new Set(movies.map((m) => m.tmdbId))
     const seeds = movies.slice(0, 5)
@@ -176,6 +177,8 @@ export default function WatchlistPage() {
       .map(([id]) => id)
 
     setLoadingSuggestions(true)
+    setSuggestionsPage(1)
+    setHasMoreSuggestions(false)
 
     Promise.all([
       // Recommendations for each seed movie
@@ -192,6 +195,7 @@ export default function WatchlistPage() {
           if (dir && !seenDirs.has(dir.id)) { seenDirs.add(dir.id); directorIds.push(dir.id) }
           if (directorIds.length >= 3) break
         }
+        directorIdsRef.current = directorIds
 
         // Fetch director films + genre discovery in parallel
         const [dirFilms, genreFilms] = await Promise.all([
@@ -227,7 +231,13 @@ export default function WatchlistPage() {
             rtScore: null,
           }))
 
+        for (let i = ranked.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [ranked[i], ranked[j]] = [ranked[j], ranked[i]]
+        }
+
         setSuggestions(ranked)
+        setHasMoreSuggestions(ranked.length > 0)
       })
       .catch(console.error)
       .finally(() => setLoadingSuggestions(false))
@@ -239,6 +249,69 @@ export default function WatchlistPage() {
       if (tmdbIds.has(tmdbId)) ids.add(wlId)
     }
     return ids
+  }
+
+  const loadMoreSuggestions = async () => {
+    const nextPage = suggestionsPage + 1
+    const inWatchlist = new Set(movies.map((m) => m.tmdbId))
+    const alreadyShown = new Set(suggestions.map((s) => s.tmdbId))
+    const exclude = new Set([...inWatchlist, ...alreadyShown])
+
+    const seeds = movies.slice(0, 5)
+    const genreCount = {}
+    for (const m of movies) {
+      for (const g of (m.genreIds || [])) genreCount[g] = (genreCount[g] || 0) + 1
+    }
+    const topGenres = Object.entries(genreCount)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 2)
+      .map(([id]) => id)
+
+    setLoadingMoreSuggestions(true)
+    try {
+      const [recResults, dirFilms, genreFilms] = await Promise.all([
+        Promise.all(seeds.map((m) => getMovieRecommendations(m.tmdbId, nextPage))),
+        Promise.all(directorIdsRef.current.map((id) => discoverByDirector({ personId: id, page: nextPage }))),
+        Promise.all(topGenres.map((genreId) => discoverMovies({ genreId, page: nextPage }))),
+      ])
+
+      const scores = {}
+      const add = (list, weight) => {
+        for (const m of list) {
+          if (!m?.id || exclude.has(m.id)) continue
+          if (!scores[m.id]) scores[m.id] = { movie: m, score: 0 }
+          scores[m.id].score += weight
+        }
+      }
+
+      recResults.forEach((r) => add(r, 3))
+      dirFilms.forEach((r) => add(r.results || [], 2))
+      genreFilms.forEach((r) => add(r.results || [], 1))
+
+      const newMovies = Object.values(scores)
+        .sort((a, b) => b.score - a.score || (b.movie.popularity || 0) - (a.movie.popularity || 0))
+        .slice(0, 16)
+        .map(({ movie: m }) => ({
+          tmdbId: m.id,
+          title: m.title,
+          year: m.release_date?.slice(0, 4),
+          posterPath: m.poster_path,
+          genreIds: m.genre_ids || [],
+          genreNames: [],
+          tmdbRating: m.vote_average,
+          rtScore: null,
+        }))
+
+      if (newMovies.length > 0) {
+        setSuggestions((prev) => [...prev, ...newMovies])
+        setSuggestionsPage(nextPage)
+      }
+      setHasMoreSuggestions(newMovies.length > 0)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoadingMoreSuggestions(false)
+    }
   }
 
   const handleSuggestionAdd = async (movie, watchlistId) => {
@@ -305,8 +378,8 @@ export default function WatchlistPage() {
   const wlSortOptions = [
     { value: 'added', label: 'Recently Added' },
     { value: 'recent', label: 'Newest' },
-    { value: 'rt', label: 'RT', icon: rtIcon },
-    { value: 'tmdb', label: 'TMDB', icon: tmdbIcon },
+    { value: 'rt', label: 'Rotten Tomatoes' },
+    { value: 'tmdb', label: 'TMDB' },
     { value: 'title', label: 'A–Z' },
   ]
 
@@ -364,7 +437,7 @@ export default function WatchlistPage() {
           {movies.length > 0 && (
             <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
               {/* Genre filter — full width on mobile */}
-              <FormControl sx={{ minWidth: 160, flex: { xs: 1, sm: '0 0 auto' } }} size="small">
+              <FormControl sx={{ width: { xs: '100%', sm: 180 }, flex: { xs: 1, sm: 'none' } }} size="small">
                 <InputLabel>Filter by Genre</InputLabel>
                 <Select value={filterGenre} label="Filter by Genre" onChange={(e) => setFilterGenre(e.target.value)}>
                   <MenuItem value="">All Genres</MenuItem>
@@ -372,46 +445,27 @@ export default function WatchlistPage() {
                 </Select>
               </FormControl>
 
-              {/* Sort — icon+menu on mobile */}
-              <Box sx={{ display: { xs: 'flex', sm: 'none' } }}>
-                <IconButton
-                  onClick={(e) => setSortMenuAnchor(e.currentTarget)}
-                  sx={{ border: '1px solid', borderColor: sortBy !== 'added' ? 'primary.main' : 'divider', color: sortBy !== 'added' ? 'primary.main' : 'text.secondary', borderRadius: 1, p: '7px' }}
-                >
-                  <TuneIcon fontSize="small" />
-                </IconButton>
-                <Menu anchorEl={sortMenuAnchor} open={!!sortMenuAnchor} onClose={() => setSortMenuAnchor(null)}>
-                  {wlSortOptions.map((o) => (
-                    <MenuItem
-                      key={o.value}
-                      selected={sortBy === o.value}
-                      onClick={() => { setSortBy(o.value); setSortMenuAnchor(null) }}
-                      sx={{ gap: 1 }}
-                    >
-                      {o.icon && <Box component="img" src={o.icon} alt="" sx={{ width: 16, height: 16 }} />}
-                      {o.label}
-                    </MenuItem>
-                  ))}
-                </Menu>
-              </Box>
-
-              {/* Sort — toggle group on desktop */}
-              <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 1 }}>
-                <SortIcon color="disabled" />
-                <ToggleButtonGroup value={sortBy} exclusive onChange={(_, v) => v && setSortBy(v)} size="small" sx={{ '& .MuiToggleButton-root': { px: '11px' } }}>
-                  <ToggleButton value="added">Recently Added</ToggleButton>
-                  <ToggleButton value="recent">Newest</ToggleButton>
-                  <ToggleButton value="rt" sx={{ gap: 0.75 }}>
-                    <Box component="img" src={rtIcon} alt="RT" sx={{ width: 16, height: 16 }} />
-                    RT
-                  </ToggleButton>
-                  <ToggleButton value="tmdb" sx={{ gap: 0.75 }}>
-                    <Box component="img" src={tmdbIcon} alt="TMDB" sx={{ width: 16, height: 16 }} />
-                    TMDB
-                  </ToggleButton>
-                  <ToggleButton value="title">A–Z</ToggleButton>
-                </ToggleButtonGroup>
-              </Box>
+              {/* Sort — icon+menu */}
+              <IconButton
+                onClick={(e) => setSortMenuAnchor(e.currentTarget)}
+                sx={{ border: '1px solid', borderColor: sortBy !== 'added' ? 'primary.main' : 'divider', color: sortBy !== 'added' ? 'primary.main' : 'text.secondary', borderRadius: 1, height: 40, gap: 1, px: 1.5 }}
+              >
+                <SortIcon fontSize="small" />
+                <Typography sx={{ fontSize: '1rem' }}>
+                  {wlSortOptions.find((o) => o.value === sortBy)?.label}
+                </Typography>
+              </IconButton>
+              <Menu anchorEl={sortMenuAnchor} open={!!sortMenuAnchor} onClose={() => setSortMenuAnchor(null)}>
+                {wlSortOptions.map((o) => (
+                  <MenuItem
+                    key={o.value}
+                    selected={sortBy === o.value}
+                    onClick={() => { setSortBy(o.value); setSortMenuAnchor(null) }}
+                  >
+                    {o.label}
+                  </MenuItem>
+                ))}
+              </Menu>
             </Box>
           )}
 
@@ -461,25 +515,39 @@ export default function WatchlistPage() {
                   <CircularProgress color="primary" />
                 </Box>
               ) : (
-                <Box sx={{
-                  display: 'grid',
-                  gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', md: 'repeat(4, 1fr)', lg: 'repeat(6, 1fr)', xl: 'repeat(8, 1fr)' },
-                  gap: 0,
-                }}>
-                  {suggestions.map((movie) => (
-                    <MovieCard
-                      key={movie.tmdbId}
-                      movie={movie}
-                      watchlists={watchlists}
-                      movieWatchlistIds={getSuggestionWatchlistIds(movie.tmdbId)}
-                      onAdd={handleSuggestionAdd}
-                      onRemove={handleSuggestionRemove}
-                      onCreateAndAdd={(name) => handleSuggestionCreateAndAdd(movie, name)}
-                      loadingRt={false}
-                      showOutline={true}
-                    />
-                  ))}
-                </Box>
+                <>
+                  <Box sx={{
+                    display: 'grid',
+                    gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', md: 'repeat(4, 1fr)', lg: 'repeat(6, 1fr)', xl: 'repeat(8, 1fr)' },
+                    gap: 0,
+                  }}>
+                    {suggestions.map((movie) => (
+                      <MovieCard
+                        key={movie.tmdbId}
+                        movie={movie}
+                        watchlists={watchlists}
+                        movieWatchlistIds={getSuggestionWatchlistIds(movie.tmdbId)}
+                        onAdd={handleSuggestionAdd}
+                        onRemove={handleSuggestionRemove}
+                        onCreateAndAdd={(name) => handleSuggestionCreateAndAdd(movie, name)}
+                        loadingRt={false}
+                        showOutline={true}
+                      />
+                    ))}
+                  </Box>
+                  {hasMoreSuggestions && (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+                      <Button
+                        variant="outlined"
+                        onClick={loadMoreSuggestions}
+                        disabled={loadingMoreSuggestions}
+                        startIcon={loadingMoreSuggestions ? <CircularProgress size={16} color="inherit" /> : null}
+                      >
+                        {loadingMoreSuggestions ? 'Loading…' : 'Show more'}
+                      </Button>
+                    </Box>
+                  )}
+                </>
               )}
             </Box>
           )}

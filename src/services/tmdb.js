@@ -32,6 +32,7 @@ export async function discoverMovies({ genreId, keywordId, companyId, page = 1 }
 
 export const CUSTOM_GENRES = [
   { id: 'kw-10123', name: 'Dark Comedy', keywordId: 10123 },
+  { id: 'kw-9748', name: 'Cult Classics', keywordId: 9748 },
 ]
 
 export const STUDIOS = [
@@ -56,9 +57,9 @@ export async function getMovieDetails(tmdbId) {
   return data
 }
 
-export async function getMovieRecommendations(tmdbId) {
+export async function getMovieRecommendations(tmdbId, page = 1) {
   const { data } = await tmdb.get(`/movie/${tmdbId}/recommendations`, {
-    params: { api_key: KEY, language: 'en-US', page: 1 },
+    params: { api_key: KEY, language: 'en-US', page },
   })
   return data.results || []
 }

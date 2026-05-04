@@ -3,14 +3,10 @@ import { useLocation } from 'react-router-dom'
 import {
   Box, TextField, Select, MenuItem, FormControl, InputLabel,
   Typography, CircularProgress, Pagination, InputAdornment,
-  ToggleButtonGroup, ToggleButton, Snackbar, Alert, Chip,
-  IconButton, Menu,
+  Snackbar, Alert, Chip, Button, Menu,
 } from '@mui/material'
 import SearchIcon from '@mui/icons-material/Search'
 import SortIcon from '@mui/icons-material/Sort'
-import TuneIcon from '@mui/icons-material/Tune'
-import rtIcon from '../assets/rt-icon.svg'
-import tmdbIcon from '../assets/tmdb-icon.svg'
 import MovieCard from '../components/MovieCard'
 import { getGenres, searchMovies, discoverMovies, discoverByDirector, getMovieDetails, CUSTOM_GENRES, STUDIOS } from '../services/tmdb'
 import { getRtScores } from '../services/omdb'
@@ -195,8 +191,8 @@ export default function SearchPage() {
   const sortOptions = [
     { value: 'popularity', label: 'Popular' },
     { value: 'recent', label: 'Recent' },
-    { value: 'rt', label: 'RT', icon: rtIcon },
-    { value: 'tmdb', label: 'TMDB', icon: tmdbIcon },
+    { value: 'rt', label: 'Rotten Tomatoes' },
+    { value: 'tmdb', label: 'TMDB' },
   ]
 
   return (
@@ -220,7 +216,7 @@ export default function SearchPage() {
 
         {/* Genre + Studio — full width on mobile */}
         <Box sx={{ display: 'flex', gap: 2, width: { xs: '100%', sm: 'auto' } }}>
-          <FormControl sx={{ minWidth: 160, flex: 1 }}>
+          <FormControl sx={{ width: { xs: '100%', sm: 180 }, flex: { xs: 1, sm: 'none' } }}>
             <InputLabel>Genre</InputLabel>
             <Select value={selectedGenre} label="Genre" onChange={(e) => { setSelectedGenre(e.target.value); setPage(1) }}>
               <MenuItem value="">All Genres</MenuItem>
@@ -228,7 +224,7 @@ export default function SearchPage() {
               {genres.map((g) => <MenuItem key={g.id} value={g.id}>{genreLabel(g.name)}</MenuItem>)}
             </Select>
           </FormControl>
-          <FormControl sx={{ minWidth: 140, flex: 1 }}>
+          <FormControl sx={{ width: { xs: '100%', sm: 150 }, flex: { xs: 1, sm: 'none' } }}>
             <InputLabel>Studio</InputLabel>
             <Select value={selectedStudio} label="Studio" onChange={(e) => { setSelectedStudio(e.target.value); setPage(1) }}>
               <MenuItem value="">All Studios</MenuItem>
@@ -237,51 +233,41 @@ export default function SearchPage() {
           </FormControl>
         </Box>
 
-        {/* Sort — icon+menu on mobile, toggle group on desktop */}
-        <Box sx={{ display: { xs: 'flex', sm: 'none' }, width: '100%' }}>
-          <IconButton
-            onClick={(e) => setSortMenuAnchor(e.currentTarget)}
-            sx={{ border: '1px solid', borderColor: sortBy !== 'popularity' ? 'primary.main' : 'divider', color: sortBy !== 'popularity' ? 'primary.main' : 'text.secondary', borderRadius: 1, gap: 1, px: 1.5, width: '100%' }}
-          >
-            <TuneIcon fontSize="small" />
-            <Typography variant="body2">{sortOptions.find(o => o.value === sortBy)?.label}</Typography>
-          </IconButton>
-          <Menu
-            anchorEl={sortMenuAnchor}
-            open={!!sortMenuAnchor}
-            onClose={() => setSortMenuAnchor(null)}
-            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-          >
-            {sortOptions.map((o) => (
-              <MenuItem
-                key={o.value}
-                selected={sortBy === o.value}
-                onClick={() => { setSortBy(o.value); setSortMenuAnchor(null) }}
-                sx={{ gap: 1 }}
-              >
-                {o.icon && <Box component="img" src={o.icon} alt="" sx={{ width: 16, height: 16 }} />}
-                {o.label}
-              </MenuItem>
-            ))}
-          </Menu>
-        </Box>
-
-        <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 1 }}>
-          <SortIcon color="disabled" />
-          <ToggleButtonGroup value={sortBy} exclusive onChange={(_, v) => v && setSortBy(v)} size="small" sx={{ '& .MuiToggleButton-root': { px: '11px' } }}>
-            <ToggleButton value="popularity">Popular</ToggleButton>
-            <ToggleButton value="recent">Recent</ToggleButton>
-            <ToggleButton value="rt" sx={{ gap: 0.75 }}>
-              <Box component="img" src={rtIcon} alt="RT" sx={{ width: 16, height: 16 }} />
-              RT
-            </ToggleButton>
-            <ToggleButton value="tmdb" sx={{ gap: 0.75 }}>
-              <Box component="img" src={tmdbIcon} alt="TMDB" sx={{ width: 16, height: 16 }} />
-              TMDB
-            </ToggleButton>
-          </ToggleButtonGroup>
-        </Box>
+        {/* Sort — icon+menu */}
+        <Button
+          onClick={(e) => setSortMenuAnchor(e.currentTarget)}
+          variant="outlined"
+          startIcon={<SortIcon />}
+          sx={{
+            height: 56,
+            borderColor: sortBy !== 'popularity' ? 'primary.main' : 'divider',
+            color: sortBy !== 'popularity' ? 'primary.main' : 'text.secondary',
+            textTransform: 'none',
+            whiteSpace: 'nowrap',
+            width: { xs: '100%', sm: 'auto' },
+            fontWeight: 400,
+            fontSize: 16,
+          }}
+        >
+          {sortOptions.find((o) => o.value === sortBy)?.label}
+        </Button>
+        <Menu
+          anchorEl={sortMenuAnchor}
+          open={!!sortMenuAnchor}
+          onClose={() => setSortMenuAnchor(null)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+          transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        >
+          {sortOptions.map((o) => (
+            <MenuItem
+              key={o.value}
+              selected={sortBy === o.value}
+              onClick={() => { setSortBy(o.value); setSortMenuAnchor(null) }}
+            >
+              {o.label}
+            </MenuItem>
+          ))}
+        </Menu>
       </Box>
 
       {selectedDirector && (
