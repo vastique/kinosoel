@@ -30,9 +30,11 @@ const theme = createTheme({
           backgroundColor: '#1A1A1A',
           borderRadius: 12,
           transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-          '&:hover': {
-            transform: 'translateY(-4px)',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+          '@media (hover: hover)': {
+            '&:hover': {
+              transform: 'translateY(-4px)',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+            },
           },
         },
       },

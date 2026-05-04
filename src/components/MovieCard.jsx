@@ -67,7 +67,6 @@ export default function MovieCard({
           overflow: 'hidden',
           cursor: 'pointer',
           borderRadius: 0,
-          outline: inAnyList && showOutline ? '2px solid #E50914' : 'none',
           '&:hover .overlay': { opacity: 1 },
         }}
       >
