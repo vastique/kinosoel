@@ -33,6 +33,7 @@ export async function discoverMovies({ genreId, keywordId, companyId, page = 1 }
 export const CUSTOM_GENRES = [
   { id: 'kw-10123', name: 'Dark Comedy', keywordId: 10123 },
   { id: 'kw-9748', name: 'Cult Classics', keywordId: 9748 },
+  { id: 'kw-potflix', name: 'Potflix', keywordId: '10776|8224|243617|54169|245597|302399|367481' },
 ]
 
 export const STUDIOS = [

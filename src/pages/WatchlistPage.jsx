@@ -1,21 +1,27 @@
 import { useState, useEffect, useRef } from 'react'
-import {
-  Box, Typography, CircularProgress,
-  FormControl, InputLabel, Select, MenuItem, Snackbar, Alert,
-  IconButton, TextField, Tooltip, Dialog, Divider, Menu,
-  DialogTitle, DialogContent, DialogActions, Button,
-} from '@mui/material'
-import BookmarkIcon from '@mui/icons-material/Bookmark'
-import SortIcon from '@mui/icons-material/Sort'
-import AddIcon from '@mui/icons-material/Add'
-import ShareIcon from '@mui/icons-material/Share'
-import ContentCopyIcon from '@mui/icons-material/ContentCopy'
+import { Bookmark, Plus, Share2, Copy, ArrowUpDown } from 'lucide-react'
+import { toast } from 'sonner'
 import MovieCard from '../components/MovieCard'
 import SortableWatchlistTabs from '../components/SortableWatchlistTabs'
 import { getWatchlistMovies, removeFromWatchlist, addToWatchlist, getAllWatchlistEntries } from '../services/watchlist'
 import { getWatchlists, createWatchlist, deleteWatchlist, saveWatchlistOrder, getOrCreateDefaultWatchlist, renameWatchlist } from '../services/watchlists'
 import { getMovieTrailerKey, getMovieRecommendations, getMovieDetails, discoverByDirector, discoverMovies } from '../services/tmdb'
 import { genreLabel } from '../utils/genres'
+import { Button } from '../components/ui/button'
+import { Input } from '../components/ui/input'
+import { Label } from '../components/ui/label'
+import { Spinner } from '../components/ui/spinner'
+import { Separator } from '../components/ui/separator'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '../components/ui/select'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from '../components/ui/dialog'
 
 export default function WatchlistPage() {
   const [watchlists, setWatchlists] = useState([])
@@ -24,7 +30,6 @@ export default function WatchlistPage() {
   const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState('added')
   const [filterGenre, setFilterGenre] = useState('')
-  const [snackbar, setSnackbar] = useState(null)
   const [newListDialog, setNewListDialog] = useState(false)
   const [newListName, setNewListName] = useState('')
   const [deleteDialog, setDeleteDialog] = useState(null)
@@ -37,7 +42,6 @@ export default function WatchlistPage() {
   const [suggestionsPage, setSuggestionsPage] = useState(1)
   const directorIdsRef = useRef([])
   const [watchlistMap, setWatchlistMap] = useState({})
-  const [sortMenuAnchor, setSortMenuAnchor] = useState(null)
   const [shareDialog, setShareDialog] = useState(false)
   const [shareText, setShareText] = useState('')
   const [shareLoading, setShareLoading] = useState(false)
@@ -51,7 +55,6 @@ export default function WatchlistPage() {
     getOrCreateDefaultWatchlist()
       .then(() => getWatchlists())
       .then((lists) => {
-        // Always put the default watchlist first
         const sorted = [
           ...lists.filter((w) => w.is_default),
           ...lists.filter((w) => !w.is_default),
@@ -103,9 +106,9 @@ export default function WatchlistPage() {
     try {
       await removeFromWatchlist(tmdbId, activeWatchlist.id)
       setMovies((prev) => prev.filter((m) => m.tmdbId !== tmdbId))
-      setSnackbar({ severity: 'info', message: 'Removed from watchlist' })
+      toast.info('Removed from watchlist')
     } catch {
-      setSnackbar({ severity: 'error', message: 'Failed to remove' })
+      toast.error('Failed to remove')
     }
   }
 
@@ -118,12 +121,11 @@ export default function WatchlistPage() {
       setNewListName('')
       setNewListDialog(false)
     } catch {
-      setSnackbar({ severity: 'error', message: 'Failed to create watchlist' })
+      toast.error('Failed to create watchlist')
     }
   }
 
   const handleReorder = (reordered) => {
-    // Keep default pinned first
     const pinned = reordered.filter((w) => w.is_default)
     const custom = reordered.filter((w) => !w.is_default)
     const final = [...pinned, ...custom]
@@ -138,7 +140,7 @@ export default function WatchlistPage() {
       setWatchlists((prev) => prev.map((w) => w.id === renameDialog.id ? { ...w, name: renameName.trim() } : w))
       setRenameDialog(null)
     } catch {
-      setSnackbar({ severity: 'error', message: 'Failed to rename watchlist' })
+      toast.error('Failed to rename watchlist')
     }
   }
 
@@ -166,7 +168,6 @@ export default function WatchlistPage() {
     const inWatchlist = new Set(movies.map((m) => m.tmdbId))
     const seeds = movies.slice(0, 5)
 
-    // Top 2 genres by frequency across the watchlist
     const genreCount = {}
     for (const m of movies) {
       for (const g of (m.genreIds || [])) genreCount[g] = (genreCount[g] || 0) + 1
@@ -181,13 +182,10 @@ export default function WatchlistPage() {
     setHasMoreSuggestions(false)
 
     Promise.all([
-      // Recommendations for each seed movie
       Promise.all(seeds.map((m) => getMovieRecommendations(m.tmdbId))),
-      // Movie details to extract directors
       Promise.all(seeds.map((m) => getMovieDetails(m.tmdbId))),
     ])
       .then(async ([recResults, detailResults]) => {
-        // Extract up to 3 unique directors
         const seenDirs = new Set()
         const directorIds = []
         for (const d of detailResults) {
@@ -197,13 +195,11 @@ export default function WatchlistPage() {
         }
         directorIdsRef.current = directorIds
 
-        // Fetch director films + genre discovery in parallel
         const [dirFilms, genreFilms] = await Promise.all([
           Promise.all(directorIds.map((id) => discoverByDirector({ personId: id, page: 1 }))),
           Promise.all(topGenres.map((genreId) => discoverMovies({ genreId, page: 1 }))),
         ])
 
-        // Score candidates: recommendations=3pts, director=2pts, genre=1pt
         const scores = {}
         const add = (list, weight) => {
           for (const m of list) {
@@ -328,9 +324,9 @@ export default function WatchlistPage() {
         setSuggestions((prev) => prev.filter((m) => m.tmdbId !== movie.tmdbId))
       }
       const wl = watchlists.find((w) => w.id === watchlistId)
-      setSnackbar({ severity: 'success', message: `Added to "${wl?.name ?? 'watchlist'}"` })
+      toast.success(`Added to "${wl?.name ?? 'watchlist'}"`)
     } catch {
-      setSnackbar({ severity: 'error', message: 'Failed to add to watchlist' })
+      toast.error('Failed to add to watchlist')
     }
   }
 
@@ -345,9 +341,9 @@ export default function WatchlistPage() {
       if (watchlistId === activeWatchlist?.id) {
         setMovies((prev) => prev.filter((m) => m.tmdbId !== tmdbId))
       }
-      setSnackbar({ severity: 'info', message: 'Removed from watchlist' })
+      toast.info('Removed from watchlist')
     } catch {
-      setSnackbar({ severity: 'error', message: 'Failed to remove from watchlist' })
+      toast.error('Failed to remove from watchlist')
     }
   }
 
@@ -357,7 +353,7 @@ export default function WatchlistPage() {
       setWatchlists((prev) => [...prev, newList])
       await handleSuggestionAdd(movie, newList.id)
     } catch {
-      setSnackbar({ severity: 'error', message: 'Failed to create watchlist' })
+      toast.error('Failed to create watchlist')
     }
   }
 
@@ -365,13 +361,12 @@ export default function WatchlistPage() {
     if (!deleteDialog) return
     try {
       await deleteWatchlist(deleteDialog.id)
-      const idx = watchlists.findIndex((w) => w.id === deleteDialog.id)
       const next = watchlists.filter((w) => w.id !== deleteDialog.id)
       setWatchlists(next)
       setActiveTab(Math.min(activeTab, Math.max(0, next.length - 1)))
       setDeleteDialog(null)
     } catch {
-      setSnackbar({ severity: 'error', message: 'Failed to delete watchlist' })
+      toast.error('Failed to delete watchlist')
     }
   }
 
@@ -385,44 +380,61 @@ export default function WatchlistPage() {
 
   if (loading && watchlists.length === 0) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 8 }}>
-        <CircularProgress color="primary" />
-      </Box>
+      <div className="flex justify-center mt-16">
+        <Spinner />
+      </div>
     )
   }
 
   return (
-    <Box sx={{ p: { xs: '6px', sm: 3 } }}>
+    <div className="p-1.5 sm:p-6">
       {/* Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-        <BookmarkIcon color="primary" />
-        <Typography variant="h5" fontWeight={700}>My Watchlists</Typography>
-        <Tooltip title="New watchlist">
-          <IconButton size="small" color="primary" onClick={() => setNewListDialog(true)} sx={{ ml: 1 }}>
-            <AddIcon />
-          </IconButton>
+      <div className="flex items-center gap-2 mb-4">
+        <Bookmark className="h-5 w-5 text-primary" />
+        <h1 className="text-xl font-bold">My Watchlists</h1>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-primary ml-1"
+              onClick={() => setNewListDialog(true)}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>New watchlist</TooltipContent>
         </Tooltip>
         {movies.length > 0 && (
-          <Tooltip title="Share watchlist">
-            <IconButton size="small" onClick={handleShare} sx={{ ml: 0.5, color: '#888', '&:hover': { color: 'primary.main' } }}>
-              <ShareIcon fontSize="small" />
-            </IconButton>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-primary"
+                onClick={handleShare}
+              >
+                <Share2 className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Share watchlist</TooltipContent>
           </Tooltip>
         )}
-      </Box>
+      </div>
 
       {watchlists.length === 0 ? (
-        <Box sx={{ textAlign: 'center', mt: 10 }}>
-          <BookmarkIcon sx={{ fontSize: 64, color: '#333', mb: 2 }} />
-          <Typography color="text.secondary" gutterBottom>No watchlists yet.</Typography>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setNewListDialog(true)}>
+        <div className="text-center mt-20">
+          <Bookmark className="h-16 w-16 text-muted mx-auto mb-4" />
+          <p className="text-muted-foreground mb-4">No watchlists yet.</p>
+          <Button onClick={() => setNewListDialog(true)}>
+            <Plus className="h-4 w-4 mr-2" />
             Create your first list
           </Button>
-        </Box>
+        </div>
       ) : (
         <>
           {/* Tabs */}
-          <Box sx={{ mb: 3 }}>
+          <div className="mb-4">
             <SortableWatchlistTabs
               watchlists={watchlists}
               activeIndex={activeTab}
@@ -431,61 +443,63 @@ export default function WatchlistPage() {
               onReorder={handleReorder}
               onEditRequest={(wl) => { setRenameDialog(wl); setRenameName(wl.name) }}
             />
-          </Box>
+          </div>
 
           {/* Filters */}
           {movies.length > 0 && (
-            <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
-              {/* Genre filter — full width on mobile */}
-              <FormControl sx={{ width: { xs: '100%', sm: 180 }, flex: { xs: 1, sm: 'none' } }} size="small">
-                <InputLabel>Filter by Genre</InputLabel>
-                <Select value={filterGenre} label="Filter by Genre" onChange={(e) => setFilterGenre(e.target.value)}>
-                  <MenuItem value="">All Genres</MenuItem>
-                  {allGenres.map((g) => <MenuItem key={g} value={g}>{genreLabel(g)}</MenuItem>)}
-                </Select>
-              </FormControl>
-
-              {/* Sort — icon+menu */}
-              <IconButton
-                onClick={(e) => setSortMenuAnchor(e.currentTarget)}
-                sx={{ border: '1px solid', borderColor: sortBy !== 'added' ? 'primary.main' : 'divider', color: sortBy !== 'added' ? 'primary.main' : 'text.secondary', borderRadius: 1, height: 40, gap: 1, px: 1.5 }}
+            <div className="flex gap-2 mb-4 flex-wrap items-center">
+              <Select
+                value={filterGenre || '__all__'}
+                onValueChange={(v) => setFilterGenre(v === '__all__' ? '' : v)}
               >
-                <SortIcon fontSize="small" />
-                <Typography sx={{ fontSize: '1rem' }}>
-                  {wlSortOptions.find((o) => o.value === sortBy)?.label}
-                </Typography>
-              </IconButton>
-              <Menu anchorEl={sortMenuAnchor} open={!!sortMenuAnchor} onClose={() => setSortMenuAnchor(null)}>
-                {wlSortOptions.map((o) => (
-                  <MenuItem
-                    key={o.value}
-                    selected={sortBy === o.value}
-                    onClick={() => { setSortBy(o.value); setSortMenuAnchor(null) }}
+                <SelectTrigger className="w-full sm:w-[180px] h-9">
+                  <SelectValue placeholder="Filter by Genre" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All Genres</SelectItem>
+                  {allGenres.map((g) => <SelectItem key={g} value={g}>{genreLabel(g)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={`gap-2 ${sortBy !== 'added' ? 'border-primary text-primary' : 'text-muted-foreground'}`}
                   >
-                    {o.label}
-                  </MenuItem>
-                ))}
-              </Menu>
-            </Box>
+                    <ArrowUpDown className="h-4 w-4" />
+                    {wlSortOptions.find((o) => o.value === sortBy)?.label}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  {wlSortOptions.map((o) => (
+                    <DropdownMenuItem
+                      key={o.value}
+                      onClick={() => setSortBy(o.value)}
+                      className={sortBy === o.value ? 'text-primary' : ''}
+                    >
+                      {o.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           )}
 
           {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 8 }}>
-              <CircularProgress color="primary" />
-            </Box>
+            <div className="flex justify-center mt-16">
+              <Spinner />
+            </div>
           ) : sorted.length === 0 ? (
-            <Box sx={{ textAlign: 'center', mt: 10 }}>
-              <BookmarkIcon sx={{ fontSize: 64, color: '#333', mb: 2 }} />
-              <Typography color="text.secondary">
+            <div className="text-center mt-20">
+              <Bookmark className="h-16 w-16 text-muted mx-auto mb-3" />
+              <p className="text-muted-foreground">
                 {movies.length === 0 ? 'This list is empty. Search for movies to add some!' : 'No movies match that genre filter.'}
-              </Typography>
-            </Box>
+              </p>
+            </div>
           ) : (
-            <Box sx={{
-              display: 'grid',
-              gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', md: 'repeat(4, 1fr)', lg: 'repeat(6, 1fr)', xl: 'repeat(8, 1fr)' },
-              gap: 0,
-            }}>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
               {sorted.map((movie) => (
                 <MovieCard
                   key={movie.tmdbId}
@@ -500,27 +514,21 @@ export default function WatchlistPage() {
                   deleteMode={true}
                 />
               ))}
-            </Box>
+            </div>
           )}
 
           {/* Suggestions */}
           {(loadingSuggestions || suggestions.length > 0) && (
-            <Box sx={{ mt: 16 }}>
-              <Divider sx={{ mb: 6 }} />
-              <Typography fontWeight={700} sx={{ mb: 2, fontSize: 20 }}>
-                You might also like
-              </Typography>
+            <div className="mt-24">
+              <Separator className="mb-8" />
+              <h2 className="text-xl font-bold mb-4">You might also like</h2>
               {loadingSuggestions ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-                  <CircularProgress color="primary" />
-                </Box>
+                <div className="flex justify-center py-10">
+                  <Spinner />
+                </div>
               ) : (
                 <>
-                  <Box sx={{
-                    display: 'grid',
-                    gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', md: 'repeat(4, 1fr)', lg: 'repeat(6, 1fr)', xl: 'repeat(8, 1fr)' },
-                    gap: 0,
-                  }}>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
                     {suggestions.map((movie) => (
                       <MovieCard
                         key={movie.tmdbId}
@@ -534,110 +542,120 @@ export default function WatchlistPage() {
                         showOutline={true}
                       />
                     ))}
-                  </Box>
+                  </div>
                   {hasMoreSuggestions && (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+                    <div className="flex justify-center mt-6">
                       <Button
-                        variant="outlined"
+                        variant="outline"
                         onClick={loadMoreSuggestions}
                         disabled={loadingMoreSuggestions}
-                        startIcon={loadingMoreSuggestions ? <CircularProgress size={16} color="inherit" /> : null}
                       >
-                        {loadingMoreSuggestions ? 'Loading…' : 'Show more'}
+                        {loadingMoreSuggestions ? <><Spinner size="sm" className="mr-2" />Loading…</> : 'Show more'}
                       </Button>
-                    </Box>
+                    </div>
                   )}
                 </>
               )}
-            </Box>
+            </div>
           )}
         </>
       )}
 
       {/* Share dialog */}
-      <Dialog open={shareDialog} onClose={() => setShareDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Share "{activeWatchlist?.name}"</DialogTitle>
-        <DialogContent>
+      <Dialog open={shareDialog} onOpenChange={setShareDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Share "{activeWatchlist?.name}"</DialogTitle>
+          </DialogHeader>
           {shareLoading ? (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 3 }}>
-              <CircularProgress size={20} />
-              <Typography variant="body2" color="text.secondary">Fetching trailer links…</Typography>
-            </Box>
+            <div className="flex items-center gap-3 py-6">
+              <Spinner size="sm" />
+              <span className="text-sm text-muted-foreground">Fetching trailer links…</span>
+            </div>
           ) : (
-            <TextField
-              fullWidth
-              multiline
+            <textarea
+              readOnly
               value={shareText}
               rows={Math.min(movies.length + 2, 16)}
-              slotProps={{ input: { readOnly: true, sx: { fontFamily: 'monospace', fontSize: 13 } } }}
-              sx={{ mt: 1 }}
+              className="w-full mt-2 rounded-md border border-input bg-transparent px-3 py-2 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-ring"
             />
           )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShareDialog(false)}>Close</Button>
+            <Button
+              onClick={() => { navigator.clipboard.writeText(shareText); setCopied(true) }}
+              disabled={shareLoading}
+            >
+              <Copy className="h-4 w-4 mr-2" />
+              {copied ? 'Copied!' : 'Copy'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShareDialog(false)}>Close</Button>
-          <Button
-            variant="contained"
-            startIcon={<ContentCopyIcon />}
-            onClick={() => { navigator.clipboard.writeText(shareText); setCopied(true) }}
-            disabled={shareLoading}
-          >
-            {copied ? 'Copied!' : 'Copy'}
-          </Button>
-        </DialogActions>
       </Dialog>
 
       {/* New list dialog */}
-      <Dialog open={newListDialog} onClose={() => setNewListDialog(false)} maxWidth="xs" fullWidth disableRestoreFocus>
-        <DialogTitle>New watchlist</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus fullWidth label="List name" value={newListName}
-            onChange={(e) => setNewListName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleCreateList()}
-            sx={{ mt: 1 }}
-          />
+      <Dialog open={newListDialog} onOpenChange={setNewListDialog}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle>New watchlist</DialogTitle>
+          </DialogHeader>
+          <div className="mt-2">
+            <Label htmlFor="new-list-name">List name</Label>
+            <Input
+              id="new-list-name"
+              autoFocus
+              value={newListName}
+              onChange={(e) => setNewListName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleCreateList()}
+              className="mt-1"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setNewListDialog(false)}>Cancel</Button>
+            <Button onClick={handleCreateList} disabled={!newListName.trim()}>Create</Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setNewListDialog(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleCreateList} disabled={!newListName.trim()}>Create</Button>
-        </DialogActions>
       </Dialog>
 
       {/* Rename dialog */}
-      <Dialog open={!!renameDialog} onClose={() => setRenameDialog(null)} maxWidth="xs" fullWidth disableRestoreFocus>
-        <DialogTitle>Rename "{renameDialog?.name}"</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus fullWidth label="List name" value={renameName}
-            onChange={(e) => setRenameName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleRename()}
-            sx={{ mt: 1 }}
-          />
+      <Dialog open={!!renameDialog} onOpenChange={(open) => !open && setRenameDialog(null)}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle>Rename "{renameDialog?.name}"</DialogTitle>
+          </DialogHeader>
+          <div className="mt-2">
+            <Label htmlFor="rename-list">List name</Label>
+            <Input
+              id="rename-list"
+              autoFocus
+              value={renameName}
+              onChange={(e) => setRenameName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleRename()}
+              className="mt-1"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRenameDialog(null)}>Cancel</Button>
+            <Button onClick={handleRename} disabled={!renameName.trim()}>Rename</Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setRenameDialog(null)}>Cancel</Button>
-          <Button variant="contained" onClick={handleRename} disabled={!renameName.trim()}>Rename</Button>
-        </DialogActions>
       </Dialog>
 
       {/* Delete confirm dialog */}
-      <Dialog open={!!deleteDialog} onClose={() => setDeleteDialog(null)} maxWidth="xs">
-        <DialogTitle>Delete "{deleteDialog?.name}"?</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary">
+      <Dialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle>Delete "{deleteDialog?.name}"?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
             This will permanently delete the list and all movies in it.
-          </Typography>
+          </p>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteDialog(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDelete}>Delete</Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteDialog(null)}>Cancel</Button>
-          <Button variant="contained" color="error" onClick={handleDelete}>Delete</Button>
-        </DialogActions>
       </Dialog>
-
-      <Snackbar open={!!snackbar} autoHideDuration={3000} onClose={() => setSnackbar(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
-        {snackbar && <Alert severity={snackbar.severity} onClose={() => setSnackbar(null)} variant="filled">{snackbar.message}</Alert>}
-      </Snackbar>
-    </Box>
+    </div>
   )
 }

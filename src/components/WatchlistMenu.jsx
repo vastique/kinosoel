@@ -1,25 +1,27 @@
 import { useState } from 'react'
+import { BookmarkPlus, Bookmark, BookmarkCheck, Check, Plus } from 'lucide-react'
 import {
-  Menu, MenuItem, Divider, ListItemIcon, ListItemText,
-  TextField, Box, IconButton, Typography, CircularProgress,
-} from '@mui/material'
-import CheckIcon from '@mui/icons-material/Check'
-import AddIcon from '@mui/icons-material/Add'
-import BookmarkIcon from '@mui/icons-material/Bookmark'
-import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder'
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu'
+import { Input } from './ui/input'
+import { Spinner } from './ui/spinner'
 
 export default function WatchlistMenu({
-  anchorEl,
-  onClose,
-  watchlists,          // [{ id, name }]
-  movieWatchlistIds,   // Set of watchlistIds this movie is already in
-  onAdd,               // (watchlistId) => void
-  onRemove,            // (watchlistId) => void
-  onCreateAndAdd,      // (name) => void
+  watchlists,
+  movieWatchlistIds,
+  inAnyList,
+  onAdd,
+  onRemove,
+  onCreateAndAdd,
 }) {
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [saving, setSaving] = useState(false)
+  const [open, setOpen] = useState(false)
 
   const handleCreate = async () => {
     if (!newName.trim()) return
@@ -28,64 +30,85 @@ export default function WatchlistMenu({
     setSaving(false)
     setNewName('')
     setCreating(false)
-    onClose()
+    setOpen(false)
+  }
+
+  const handleOpenChange = (v) => {
+    setOpen(v)
+    if (!v) { setCreating(false); setNewName('') }
   }
 
   return (
-    <Menu
-      anchorEl={anchorEl}
-      open={Boolean(anchorEl)}
-      onClose={onClose}
-      slotProps={{ paper: { sx: { minWidth: 200, bgcolor: '#1a1a1a' } } }}
-    >
-      <Typography variant="caption" sx={{ px: 2, py: 0.5, color: '#888', display: 'block' }}>
-        Save to watchlist
-      </Typography>
-      <Divider sx={{ mb: 0.5 }} />
+    <DropdownMenu open={open} onOpenChange={handleOpenChange}>
+      <DropdownMenuTrigger asChild>
+        <button
+          onClick={(e) => e.stopPropagation()}
+          className={`p-1.5 rounded transition-colors ${
+            inAnyList
+              ? 'bg-[#E50914] text-white hover:bg-[#c0070f]'
+              : 'text-white hover:text-white/80'
+          }`}
+        >
+          {inAnyList
+            ? <BookmarkCheck className="h-4 w-4" />
+            : <BookmarkPlus className="h-4 w-4" />}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        className="min-w-[200px] bg-[#1a1a1a]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-2 py-1 text-xs text-muted-foreground">Save to watchlist</div>
+        <DropdownMenuSeparator />
 
-      {watchlists.map((wl) => {
-        const inList = movieWatchlistIds?.has(wl.id)
-        return (
-          <MenuItem
-            key={wl.id}
-            onClick={() => { inList ? onRemove(wl.id) : onAdd(wl.id); onClose() }}
-          >
-            <ListItemIcon sx={{ minWidth: 32 }}>
+        {watchlists.map((wl) => {
+          const inList = movieWatchlistIds?.has(wl.id)
+          return (
+            <DropdownMenuItem
+              key={wl.id}
+              onClick={() => { inList ? onRemove(wl.id) : onAdd(wl.id); setOpen(false) }}
+              className="flex items-center gap-2"
+            >
               {inList
-                ? <BookmarkIcon fontSize="small" color="primary" />
-                : <BookmarkBorderIcon fontSize="small" sx={{ color: '#666' }} />}
-            </ListItemIcon>
-            <ListItemText primary={wl.name} />
-            {inList && <CheckIcon fontSize="small" color="primary" sx={{ ml: 1 }} />}
-          </MenuItem>
-        )
-      })}
+                ? <Bookmark className="h-4 w-4 text-primary shrink-0" />
+                : <Bookmark className="h-4 w-4 text-muted-foreground shrink-0" />}
+              <span className="flex-1">{wl.name}</span>
+              {inList && <Check className="h-4 w-4 text-primary" />}
+            </DropdownMenuItem>
+          )
+        })}
 
-      <Divider sx={{ my: 0.5 }} />
+        <DropdownMenuSeparator />
 
-      {creating ? (
-        <Box sx={{ px: 1.5, py: 1, display: 'flex', gap: 1, alignItems: 'center' }}>
-          <TextField
-            size="small"
-            placeholder="List name"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-            autoFocus
-            sx={{ flexGrow: 1 }}
-          />
-          <IconButton size="small" color="primary" onClick={handleCreate} disabled={saving}>
-            {saving ? <CircularProgress size={16} /> : <CheckIcon fontSize="small" />}
-          </IconButton>
-        </Box>
-      ) : (
-        <MenuItem onClick={() => setCreating(true)}>
-          <ListItemIcon sx={{ minWidth: 32 }}>
-            <AddIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText primary="New list…" />
-        </MenuItem>
-      )}
-    </Menu>
+        {creating ? (
+          <div
+            className="px-2 py-2 flex gap-2 items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Input
+              size="sm"
+              placeholder="List name"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') handleCreate() }}
+              autoFocus
+              className="h-7 text-sm flex-1"
+            />
+            <button
+              onClick={handleCreate}
+              disabled={saving}
+              className="text-primary hover:text-primary/80 disabled:opacity-50 shrink-0"
+            >
+              {saving ? <Spinner size="sm" /> : <Check className="h-4 w-4" />}
+            </button>
+          </div>
+        ) : (
+          <DropdownMenuItem onClick={(e) => { e.preventDefault(); setCreating(true) }} className="gap-2">
+            <Plus className="h-4 w-4" />
+            New list…
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

@@ -1,17 +1,14 @@
 import { useState } from 'react'
-import {
-  Card, CardMedia, Typography, IconButton, Box,
-  Dialog, DialogTitle, DialogContent, DialogActions, Button, CircularProgress,
-} from '@mui/material'
-import BookmarkAddIcon from '@mui/icons-material/BookmarkAdd'
-import DeleteIcon from '@mui/icons-material/Delete'
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
+import { Info, Trash2 } from 'lucide-react'
 import rtIcon from '../assets/rt-icon.svg'
 import tmdbIcon from '../assets/tmdb-icon.svg'
 import { POSTER_BASE, getMovieTrailerKey, getMovieDetails } from '../services/tmdb'
 import { genreLabel } from '../utils/genres'
 import TrailerModal from './TrailerModal'
 import WatchlistMenu from './WatchlistMenu'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog'
+import { Button } from './ui/button'
+import { Spinner } from './ui/spinner'
 
 export default function MovieCard({
   movie, loadingRt, director, onDirectorClick,
@@ -25,7 +22,6 @@ export default function MovieCard({
   const [trailerOpen, setTrailerOpen] = useState(false)
   const [trailerKey, setTrailerKey] = useState(null)
   const [trailerLoading, setTrailerLoading] = useState(false)
-  const [menuAnchor, setMenuAnchor] = useState(null)
   const [infoOpen, setInfoOpen] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [synopsis, setSynopsis] = useState(overview || null)
@@ -60,144 +56,109 @@ export default function MovieCard({
 
   return (
     <>
-      <Card
+      <div
+        className="relative overflow-hidden cursor-pointer group"
         onClick={handleTrailerClick}
-        sx={{
-          position: 'relative',
-          overflow: 'hidden',
-          cursor: 'pointer',
-          borderRadius: 0,
-          '&:hover .overlay': { opacity: 1 },
-        }}
       >
-        <CardMedia
-          component="img"
-          image={poster}
+        <img
+          src={poster}
           alt={title}
           draggable={false}
-          sx={{ width: '100%', aspectRatio: '2/3', objectFit: 'cover', display: 'block', userSelect: 'none' }}
+          className="w-full aspect-[2/3] object-cover block select-none"
         />
 
-        <IconButton
-          size="small"
+        {/* Info button */}
+        <button
           onClick={handleInfoClick}
-          sx={{
-            position: 'absolute', top: 8, right: 8,
-            backgroundColor: 'rgba(0,0,0,0.55)',
-            color: '#fff',
-            '&:hover': { backgroundColor: 'rgba(0,0,0,0.8)' },
-          }}
+          className="absolute top-2 right-2 h-7 w-7 flex items-center justify-center rounded-full bg-black/55 text-white hover:bg-black/80 transition-colors"
         >
-          <InfoOutlinedIcon sx={{ fontSize: 16 }} />
-        </IconButton>
+          <Info className="h-3.5 w-3.5" />
+        </button>
 
-        {/* Gradient overlay */}
-        <Box
-          className="overlay"
+        {/* Gradient overlay — hidden by default, visible on hover */}
+        <div
+          className="overlay absolute bottom-0 left-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-4 pt-10 flex flex-col gap-2.5"
+          style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.75) 50%, transparent 100%)' }}
           onClick={(e) => e.stopPropagation()}
-          sx={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.75) 50%, transparent 100%)',
-            p: '16px',
-            pt: '40px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px',
-          }}
         >
           {/* Title + year + director */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <Typography noWrap title={title} sx={{ fontWeight: 700, fontSize: 16, color: '#fff', lineHeight: 1.3 }}>
+          <div className="flex flex-col gap-1">
+            <span className="font-bold text-base text-white leading-tight truncate" title={title}>
               {title}
-            </Typography>
-            <Box sx={{ display: 'flex', gap: '6px', alignItems: 'center', overflow: 'hidden' }}>
-              <Typography sx={{ fontSize: 13, color: '#fff', fontWeight: 500, lineHeight: 1.3, flexShrink: 0 }}>
+            </span>
+            <div className="flex gap-1.5 items-center overflow-hidden">
+              <span className="text-[13px] text-white font-medium leading-tight shrink-0">
                 {year || '—'}
-              </Typography>
+              </span>
               {director && (
                 <>
-                  <Typography sx={{ fontSize: 13, color: '#fff', fontWeight: 500, flexShrink: 0 }}>•</Typography>
-                  <Typography
-                    noWrap
+                  <span className="text-[13px] text-white font-medium shrink-0">•</span>
+                  <span
+                    className="text-[13px] text-white font-medium leading-tight cursor-pointer hover:text-primary overflow-hidden text-ellipsis truncate"
                     onClick={(e) => { e.stopPropagation(); onDirectorClick?.(director) }}
-                    sx={{ fontSize: 13, color: '#fff', fontWeight: 500, lineHeight: 1.3, cursor: 'pointer', '&:hover': { color: 'primary.main' }, overflow: 'hidden', textOverflow: 'ellipsis' }}
                   >
                     {director.name}
-                  </Typography>
+                  </span>
                 </>
               )}
-            </Box>
-          </Box>
+            </div>
+          </div>
 
-          {/* Genre chips */}
+          {/* Genre tags */}
           {genreNames.length > 0 && (
-            <Box sx={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+            <div className="flex gap-1 flex-wrap">
               {genreNames.slice(0, 2).map((g) => (
-                <Box
+                <span
                   key={g}
-                  sx={{
-                    border: '1px solid rgba(255,255,255,0.5)',
-                    borderRadius: '6px',
-                    px: '5px',
-                    py: '3px',
-                  }}
+                  className="border border-white/50 rounded-[6px] px-1.5 py-[3px] text-[11px] text-white/80 font-medium leading-tight whitespace-nowrap"
                 >
-                  <Typography sx={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', fontWeight: 500, lineHeight: 1.3, whiteSpace: 'nowrap' }}>
-                    {genreLabel(g)}
-                  </Typography>
-                </Box>
+                  {genreLabel(g)}
+                </span>
               ))}
-            </Box>
+            </div>
           )}
 
           {/* Ratings + bookmark */}
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Box sx={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <div className="flex items-center justify-between">
+            <div className="flex gap-2.5 items-center">
               {rtScore != null && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Box component="img" src={rtIcon} alt="RT" sx={{ width: 20, height: 20, flexShrink: 0 }} />
-                  <Typography sx={{ fontSize: 13, color: '#fff', fontWeight: 500, lineHeight: 1.3, whiteSpace: 'nowrap' }}>
+                <div className="flex items-center gap-1.5">
+                  <img src={rtIcon} alt="RT" className="w-5 h-5 shrink-0" />
+                  <span className="text-[13px] text-white font-medium leading-tight whitespace-nowrap">
                     {rtScore}%
-                  </Typography>
-                </Box>
+                  </span>
+                </div>
               )}
               {tmdbRating > 0 && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Box component="img" src={tmdbIcon} alt="TMDB" sx={{ width: 20, height: 20, flexShrink: 0 }} />
-                  <Typography sx={{ fontSize: 13, color: '#fff', fontWeight: 500, lineHeight: 1.3, whiteSpace: 'nowrap' }}>
+                <div className="flex items-center gap-1.5">
+                  <img src={tmdbIcon} alt="TMDB" className="w-5 h-5 shrink-0" />
+                  <span className="text-[13px] text-white font-medium leading-tight whitespace-nowrap">
                     {tmdbRating.toFixed(1)}
-                  </Typography>
-                </Box>
+                  </span>
+                </div>
               )}
-            </Box>
+            </div>
 
             {deleteMode ? (
-              <IconButton
-                size="small"
+              <button
                 onClick={(e) => { e.stopPropagation(); setDeleteConfirmOpen(true) }}
-                sx={{ color: '#E50914', '&:hover': { color: '#ff4444' } }}
+                className="text-[#E50914] hover:text-[#ff4444] p-1 rounded"
               >
-                <DeleteIcon fontSize="small" />
-              </IconButton>
+                <Trash2 className="h-4 w-4" />
+              </button>
             ) : (
-              <IconButton
-                size="small"
-                onClick={(e) => { e.stopPropagation(); setMenuAnchor(e.currentTarget) }}
-                sx={inAnyList ? {
-                  backgroundColor: '#E50914',
-                  color: '#fff',
-                  '&:hover': { backgroundColor: '#c0070f' },
-                } : { color: '#fff' }}
-              >
-                <BookmarkAddIcon fontSize="small" />
-              </IconButton>
+              <WatchlistMenu
+                watchlists={watchlists ?? []}
+                movieWatchlistIds={movieWatchlistIds}
+                inAnyList={inAnyList}
+                onAdd={(watchlistId) => onAdd(movie, watchlistId)}
+                onRemove={(watchlistId) => onRemove(tmdbId, watchlistId)}
+                onCreateAndAdd={onCreateAndAdd}
+              />
             )}
-          </Box>
-        </Box>
-      </Card>
+          </div>
+        </div>
+      </div>
 
       <TrailerModal
         open={trailerOpen}
@@ -213,79 +174,70 @@ export default function MovieCard({
         onCreateAndAdd={onCreateAndAdd}
       />
 
-      <WatchlistMenu
-        anchorEl={menuAnchor}
-        onClose={() => setMenuAnchor(null)}
-        watchlists={watchlists ?? []}
-        movieWatchlistIds={movieWatchlistIds}
-        onAdd={(watchlistId) => onAdd(movie, watchlistId)}
-        onRemove={(watchlistId) => onRemove(tmdbId, watchlistId)}
-        onCreateAndAdd={onCreateAndAdd}
-      />
-
-      <Dialog open={infoOpen} onClose={() => setInfoOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>{title}</DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: 'flex', gap: 2.5 }}>
-            {/* Poster — desktop only */}
+      {/* Info dialog */}
+      <Dialog open={infoOpen} onOpenChange={setInfoOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-bold">{title}</DialogTitle>
+          </DialogHeader>
+          <div className="flex gap-6">
             {posterPath && (
-              <Box
-                component="img"
+              <img
                 src={poster}
                 alt={title}
-                sx={{ display: { xs: 'none', sm: 'block' }, width: 220, flexShrink: 0, alignSelf: 'flex-start', borderRadius: 1 }}
+                className="hidden sm:block w-[220px] shrink-0 self-start rounded"
               />
             )}
-
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, flex: 1 }}>
-              <Box sx={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                {year && <Typography variant="body2" color="text.secondary">{year}</Typography>}
-                {director && year && <Typography variant="body2" color="text.secondary">•</Typography>}
+            <div className="flex flex-col gap-3 flex-1">
+              <div className="flex gap-1.5 items-center flex-wrap">
+                {year && <span className="text-sm text-muted-foreground">{year}</span>}
+                {director && year && <span className="text-sm text-muted-foreground">•</span>}
                 {director && (
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
+                  <button
+                    className="text-sm text-muted-foreground hover:text-primary"
                     onClick={() => { setInfoOpen(false); onDirectorClick?.(director) }}
                   >
                     {director.name}
-                  </Typography>
+                  </button>
                 )}
-              </Box>
+              </div>
               {genreNames.length > 0 && (
-                <Box sx={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                <div className="flex gap-1.5 flex-wrap">
                   {genreNames.map((g) => (
-                    <Box key={g} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '6px', px: '8px', py: '3px' }}>
-                      <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{genreLabel(g)}</Typography>
-                    </Box>
+                    <span key={g} className="border border-border rounded-[6px] px-2 py-[3px] text-xs text-muted-foreground">
+                      {genreLabel(g)}
+                    </span>
                   ))}
-                </Box>
+                </div>
               )}
               {synopsisLoading ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
-                  <CircularProgress size={24} color="primary" />
-                </Box>
+                <div className="flex justify-center py-6">
+                  <Spinner size="sm" />
+                </div>
               ) : (
-                <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
+                <p className="text-sm text-muted-foreground leading-relaxed">
                   {synopsis || 'No synopsis available.'}
-                </Typography>
+                </p>
               )}
-            </Box>
-          </Box>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)} maxWidth="xs">
-        <DialogTitle sx={{ fontWeight: 700 }}>Remove from watchlist?</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary">
+      {/* Delete confirm dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle>Remove from watchlist?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
             "{title}" will be removed from this watchlist.
-          </Typography>
+          </p>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => { onRemove(tmdbId); setDeleteConfirmOpen(false) }}>Remove</Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
-          <Button variant="contained" color="error" onClick={() => { onRemove(tmdbId); setDeleteConfirmOpen(false) }}>Remove</Button>
-        </DialogActions>
       </Dialog>
     </>
   )

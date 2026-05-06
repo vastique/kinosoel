@@ -1,18 +1,23 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useLocation } from 'react-router-dom'
-import {
-  Box, TextField, Select, MenuItem, FormControl, InputLabel,
-  Typography, CircularProgress, Pagination, InputAdornment,
-  Snackbar, Alert, Chip, Button, Menu,
-} from '@mui/material'
-import SearchIcon from '@mui/icons-material/Search'
-import SortIcon from '@mui/icons-material/Sort'
+import { Search, ArrowUpDown, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { toast } from 'sonner'
 import MovieCard from '../components/MovieCard'
 import { getGenres, searchMovies, discoverMovies, discoverByDirector, getMovieDetails, CUSTOM_GENRES, STUDIOS } from '../services/tmdb'
 import { getRtScores } from '../services/omdb'
 import { genreLabel } from '../utils/genres'
 import { addToWatchlist, removeFromWatchlist, getAllWatchlistEntries } from '../services/watchlist'
 import { getWatchlists, createWatchlist } from '../services/watchlists'
+import { Input } from '../components/ui/input'
+import { Button } from '../components/ui/button'
+import { Spinner } from '../components/ui/spinner'
+import { Badge } from '../components/ui/badge'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '../components/ui/select'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu'
 
 export default function SearchPage() {
   const location = useLocation()
@@ -42,10 +47,7 @@ export default function SearchPage() {
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [watchlists, setWatchlists] = useState([])
-  // { [watchlistId]: Set<tmdbId> }
   const [watchlistMap, setWatchlistMap] = useState({})
-  const [snackbar, setSnackbar] = useState(null)
-  const [sortMenuAnchor, setSortMenuAnchor] = useState(null)
 
   useEffect(() => {
     getGenres().then(setGenres).catch(console.error)
@@ -58,7 +60,6 @@ export default function SearchPage() {
     [genres]
   )
 
-  // Returns Set of watchlistIds this movie belongs to
   const getMovieWatchlistIds = (tmdbId) => {
     const ids = new Set()
     for (const [wlId, tmdbIds] of Object.entries(watchlistMap)) {
@@ -156,9 +157,9 @@ export default function SearchPage() {
         return next
       })
       const wl = watchlists.find((w) => w.id === watchlistId)
-      setSnackbar({ severity: 'success', message: `Added to "${wl?.name ?? 'watchlist'}"` })
+      toast.success(`Added to "${wl?.name ?? 'watchlist'}"`)
     } catch {
-      setSnackbar({ severity: 'error', message: 'Failed to add to watchlist' })
+      toast.error('Failed to add to watchlist')
     }
   }
 
@@ -172,9 +173,9 @@ export default function SearchPage() {
         }
         return next
       })
-      setSnackbar({ severity: 'info', message: 'Removed from watchlist' })
+      toast.info('Removed from watchlist')
     } catch {
-      setSnackbar({ severity: 'error', message: 'Failed to remove from watchlist' })
+      toast.error('Failed to remove from watchlist')
     }
   }
 
@@ -184,7 +185,7 @@ export default function SearchPage() {
       setWatchlists((prev) => [...prev, newList])
       await handleAdd(movie, newList.id)
     } catch {
-      setSnackbar({ severity: 'error', message: 'Failed to create watchlist' })
+      toast.error('Failed to create watchlist')
     }
   }
 
@@ -195,107 +196,99 @@ export default function SearchPage() {
     { value: 'tmdb', label: 'TMDB' },
   ]
 
+  const currentSortLabel = sortOptions.find((o) => o.value === sortBy)?.label
+
   return (
-    <Box sx={{ p: { xs: '6px', sm: 3 } }}>
-      <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
-        <TextField
-          label="Search movies…"
-          value={query}
-          onChange={(e) => { setQuery(e.target.value); setPage(1) }}
-          sx={{ flexGrow: 1, minWidth: 220 }}
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon color="disabled" />
-                </InputAdornment>
-              ),
-            },
-          }}
-        />
-
-        {/* Genre + Studio — full width on mobile */}
-        <Box sx={{ display: 'flex', gap: 2, width: { xs: '100%', sm: 'auto' } }}>
-          <FormControl sx={{ width: { xs: '100%', sm: 180 }, flex: { xs: 1, sm: 'none' } }}>
-            <InputLabel>Genre</InputLabel>
-            <Select value={selectedGenre} label="Genre" onChange={(e) => { setSelectedGenre(e.target.value); setPage(1) }}>
-              <MenuItem value="">All Genres</MenuItem>
-              {CUSTOM_GENRES.map((g) => <MenuItem key={g.id} value={g.id}>{g.name}</MenuItem>)}
-              {genres.map((g) => <MenuItem key={g.id} value={g.id}>{genreLabel(g.name)}</MenuItem>)}
-            </Select>
-          </FormControl>
-          <FormControl sx={{ width: { xs: '100%', sm: 150 }, flex: { xs: 1, sm: 'none' } }}>
-            <InputLabel>Studio</InputLabel>
-            <Select value={selectedStudio} label="Studio" onChange={(e) => { setSelectedStudio(e.target.value); setPage(1) }}>
-              <MenuItem value="">All Studios</MenuItem>
-              {STUDIOS.map((s) => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
-            </Select>
-          </FormControl>
-        </Box>
-
-        {/* Sort — icon+menu */}
-        <Button
-          onClick={(e) => setSortMenuAnchor(e.currentTarget)}
-          variant="outlined"
-          startIcon={<SortIcon />}
-          sx={{
-            height: 56,
-            borderColor: sortBy !== 'popularity' ? 'primary.main' : 'divider',
-            color: sortBy !== 'popularity' ? 'primary.main' : 'text.secondary',
-            textTransform: 'none',
-            whiteSpace: 'nowrap',
-            width: { xs: '100%', sm: 'auto' },
-            fontWeight: 400,
-            fontSize: 16,
-          }}
-        >
-          {sortOptions.find((o) => o.value === sortBy)?.label}
-        </Button>
-        <Menu
-          anchorEl={sortMenuAnchor}
-          open={!!sortMenuAnchor}
-          onClose={() => setSortMenuAnchor(null)}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-          transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-        >
-          {sortOptions.map((o) => (
-            <MenuItem
-              key={o.value}
-              selected={sortBy === o.value}
-              onClick={() => { setSortBy(o.value); setSortMenuAnchor(null) }}
-            >
-              {o.label}
-            </MenuItem>
-          ))}
-        </Menu>
-      </Box>
-
-      {selectedDirector && (
-        <Box sx={{ mb: 2 }}>
-          <Chip
-            label={`Director: ${selectedDirector.name}`}
-            onDelete={() => { setSelectedDirector(null); setPage(1) }}
-            color="primary"
-            variant="outlined"
+    <div className="p-1.5 sm:p-6">
+      {/* Controls */}
+      <div className="flex gap-2 mb-4 flex-wrap items-center">
+        {/* Search */}
+        <div className="relative flex-1 min-w-[220px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search movies…"
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); setPage(1) }}
+            className="pl-9"
           />
-        </Box>
+        </div>
+
+        {/* Genre + Studio */}
+        <div className="flex gap-2 w-full sm:w-auto">
+          <Select value={selectedGenre || '__all__'} onValueChange={(v) => { setSelectedGenre(v === '__all__' ? '' : v); setPage(1) }}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue placeholder="Genre" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All Genres</SelectItem>
+              {CUSTOM_GENRES.map((g) => <SelectItem key={g.id} value={String(g.id)}>{g.name}</SelectItem>)}
+              {genres.map((g) => <SelectItem key={g.id} value={String(g.id)}>{genreLabel(g.name)}</SelectItem>)}
+            </SelectContent>
+          </Select>
+
+          <Select value={selectedStudio || '__all__'} onValueChange={(v) => { setSelectedStudio(v === '__all__' ? '' : v); setPage(1) }}>
+            <SelectTrigger className="w-full sm:w-[150px]">
+              <SelectValue placeholder="Studio" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All Studios</SelectItem>
+              {STUDIOS.map((s) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Sort dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              className={`gap-2 w-full sm:w-auto ${sortBy !== 'popularity' ? 'border-primary text-primary' : 'text-muted-foreground'}`}
+            >
+              <ArrowUpDown className="h-4 w-4" />
+              {currentSortLabel}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {sortOptions.map((o) => (
+              <DropdownMenuItem
+                key={o.value}
+                onClick={() => setSortBy(o.value)}
+                className={sortBy === o.value ? 'text-primary' : ''}
+              >
+                {o.label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* Director filter chip */}
+      {selectedDirector && (
+        <div className="mb-3">
+          <Badge variant="outline" className="gap-1 pl-3 pr-2 py-1 text-sm border-primary text-primary">
+            Director: {selectedDirector.name}
+            <button
+              onClick={() => { setSelectedDirector(null); setPage(1) }}
+              className="ml-1 rounded-full hover:bg-primary/20 p-0.5"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </Badge>
+        </div>
       )}
 
+      {/* Content */}
       {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 8 }}>
-          <CircularProgress color="primary" />
-        </Box>
+        <div className="flex justify-center mt-16">
+          <Spinner />
+        </div>
       ) : sortedMovies.length === 0 ? (
-        <Typography color="text.secondary" sx={{ textAlign: 'center', mt: 8 }}>
+        <p className="text-center text-muted-foreground mt-16">
           No movies found. Try a different search.
-        </Typography>
+        </p>
       ) : (
         <>
-          <Box sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', md: 'repeat(4, 1fr)', lg: 'repeat(6, 1fr)', xl: 'repeat(8, 1fr)' },
-            gap: 0,
-          }}>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
             {sortedMovies.map((movie) => (
               <MovieCard
                 key={movie.tmdbId}
@@ -310,17 +303,40 @@ export default function SearchPage() {
                 onDirectorClick={(dir) => { setSelectedDirector(dir); setPage(1) }}
               />
             ))}
-          </Box>
+          </div>
 
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-            <Pagination count={totalPages} page={page} onChange={(_, v) => { setPage(v); window.scrollTo({ top: 0, behavior: 'smooth' }) }} color="primary" shape="rounded" />
-          </Box>
+          {/* Pagination */}
+          <div className="flex items-center justify-center gap-2 mt-6 flex-wrap">
+            <Button
+              variant="outline"
+              size="icon"
+              disabled={page === 1}
+              onClick={() => { setPage(page - 1); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <Button
+                key={p}
+                variant={p === page ? 'default' : 'ghost'}
+                size="icon"
+                onClick={() => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+                className="w-9 h-9"
+              >
+                {p}
+              </Button>
+            ))}
+            <Button
+              variant="outline"
+              size="icon"
+              disabled={page === totalPages}
+              onClick={() => { setPage(page + 1); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </>
       )}
-
-      <Snackbar open={!!snackbar} autoHideDuration={3000} onClose={() => setSnackbar(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
-        {snackbar && <Alert severity={snackbar.severity} onClose={() => setSnackbar(null)} variant="filled">{snackbar.message}</Alert>}
-      </Snackbar>
-    </Box>
+    </div>
   )
 }

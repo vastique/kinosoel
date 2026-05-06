@@ -1,87 +1,68 @@
-import { useState } from 'react'
-import { Modal, Box, IconButton, Typography, CircularProgress } from '@mui/material'
-import CloseIcon from '@mui/icons-material/Close'
-import BookmarkAddIcon from '@mui/icons-material/BookmarkAdd'
+import { X } from 'lucide-react'
 import WatchlistMenu from './WatchlistMenu'
+import { Spinner } from './ui/spinner'
 
 export default function TrailerModal({
   open, onClose, title, youtubeKey, loading,
   movie, watchlists, movieWatchlistIds, onAdd, onRemove, onCreateAndAdd,
 }) {
-  const [menuAnchor, setMenuAnchor] = useState(null)
   const inAnyList = movieWatchlistIds?.size > 0
 
+  if (!open) return null
+
   return (
-    <>
-      <Modal open={open} onClose={onClose} slotProps={{ backdrop: { sx: { backgroundColor: 'rgba(0,0,0,0.92)' } } }}>
-        <Box
-          sx={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: { xs: '95vw', sm: '90vw', md: '85vw' },
-            maxWidth: 1400,
-            bgcolor: '#0D0D0D',
-            borderRadius: 2,
-            boxShadow: '0 0 100px rgba(229,9,20,0.6)',
-            outline: 'none',
-            overflow: 'hidden',
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1.5 }}>
-            <Typography variant="subtitle1" fontWeight={600} noWrap sx={{ flexGrow: 1, mr: 1 }}>
-              {title}
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <IconButton
-                size="small"
-                onClick={(e) => setMenuAnchor(e.currentTarget)}
-                sx={inAnyList ? {
-                  backgroundColor: '#E50914',
-                  color: '#fff',
-                  '&:hover': { backgroundColor: '#c0070f' },
-                } : { color: '#888' }}
-              >
-                <BookmarkAddIcon fontSize="small" />
-              </IconButton>
-              <IconButton onClick={onClose} size="small" sx={{ color: '#888' }}>
-                <CloseIcon />
-              </IconButton>
-            </Box>
-          </Box>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ backgroundColor: 'rgba(0,0,0,0.92)' }}
+      onClick={onClose}
+    >
+      <div
+        className="relative w-[95vw] sm:w-[90vw] md:w-[85vw] max-w-[1400px] bg-[#0D0D0D] rounded-xl overflow-hidden"
+        style={{ boxShadow: '0 0 100px rgba(229,9,20,0.4)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3">
+          <span className="font-semibold text-base truncate flex-1 mr-2">{title}</span>
+          <div className="flex items-center gap-1 shrink-0">
+            <WatchlistMenu
+              watchlists={watchlists ?? []}
+              movieWatchlistIds={movieWatchlistIds}
+              inAnyList={inAnyList}
+              onAdd={(watchlistId) => onAdd(movie, watchlistId)}
+              onRemove={(watchlistId) => onRemove(movie?.tmdbId, watchlistId)}
+              onCreateAndAdd={onCreateAndAdd}
+            />
+            <button
+              onClick={onClose}
+              className="p-1.5 text-muted-foreground hover:text-foreground rounded transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
 
-          <Box sx={{ position: 'relative', paddingTop: '56.25%', backgroundColor: '#000' }}>
-            {loading ? (
-              <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <CircularProgress color="primary" />
-              </Box>
-            ) : youtubeKey ? (
-              <iframe
-                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
-                src={`https://www.youtube.com/embed/${youtubeKey}?autoplay=1`}
-                title={title}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-            ) : (
-              <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Typography color="text.secondary">No trailer available</Typography>
-              </Box>
-            )}
-          </Box>
-        </Box>
-      </Modal>
-
-      <WatchlistMenu
-        anchorEl={menuAnchor}
-        onClose={() => setMenuAnchor(null)}
-        watchlists={watchlists ?? []}
-        movieWatchlistIds={movieWatchlistIds}
-        onAdd={(watchlistId) => onAdd(movie, watchlistId)}
-        onRemove={(watchlistId) => onRemove(movie?.tmdbId, watchlistId)}
-        onCreateAndAdd={onCreateAndAdd}
-      />
-    </>
+        {/* Video area */}
+        <div className="relative pt-[56.25%] bg-black">
+          {loading ? (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Spinner />
+            </div>
+          ) : youtubeKey ? (
+            <iframe
+              className="absolute inset-0 w-full h-full border-0"
+              src={`https://www.youtube.com/embed/${youtubeKey}?autoplay=1`}
+              title={title}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-muted-foreground">No trailer available</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }

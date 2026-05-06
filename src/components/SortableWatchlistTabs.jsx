@@ -1,8 +1,5 @@
 import { useState } from 'react'
-import { Box, Typography, IconButton, Menu, MenuItem, ListItemIcon, ListItemText } from '@mui/material'
-import DeleteIcon from '@mui/icons-material/Delete'
-import EditIcon from '@mui/icons-material/Edit'
-import MenuIcon from '@mui/icons-material/Menu'
+import { Trash2, Pencil, Menu } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -18,82 +15,80 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu'
 
 function FixedTab({ label, isActive, onClick }) {
   return (
-    <Box
-      sx={{
-        display: 'flex', alignItems: 'center', gap: 0.5,
-        px: 1.5, py: 1, cursor: 'pointer', whiteSpace: 'nowrap',
-        borderBottom: isActive ? '2px solid' : '2px solid transparent',
-        borderColor: isActive ? 'primary.main' : 'transparent',
-        color: isActive ? 'primary.main' : 'text.secondary',
-        '&:hover': { color: 'text.primary' },
-      }}
+    <button
+      className={`flex items-center gap-1 px-3 py-2 cursor-pointer whitespace-nowrap border-b-2 transition-colors ${
+        isActive
+          ? 'border-primary text-primary'
+          : 'border-transparent text-muted-foreground hover:text-foreground'
+      }`}
       onClick={onClick}
     >
-      <Typography sx={{ fontSize: 20, fontWeight: isActive ? 700 : 400 }}>{label}</Typography>
-    </Box>
+      <span className={`text-xl ${isActive ? 'font-bold' : 'font-normal'}`}>{label}</span>
+    </button>
   )
 }
 
 function SortableTab({ id, label, isActive, onClick, onDelete, onEditRequest }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
-  const [menuAnchor, setMenuAnchor] = useState(null)
-
-  const openMenu = (e) => { e.stopPropagation(); setMenuAnchor(e.currentTarget) }
-  const closeMenu = () => setMenuAnchor(null)
+  const [open, setOpen] = useState(false)
 
   return (
-    <Box
+    <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      sx={{
-        display: 'flex', alignItems: 'center', gap: 0.5,
-        px: 1.5, py: 1,
-        borderBottom: isActive ? '2px solid' : '2px solid transparent',
-        borderColor: isActive ? 'primary.main' : 'transparent',
-        color: isActive ? 'primary.main' : 'text.secondary',
-        opacity: isDragging ? 0.4 : 1,
-        userSelect: 'none',
-        cursor: 'grab',
-        '&:hover': { color: 'text.primary', cursor: 'grab' },
-        whiteSpace: 'nowrap',
-      }}
+      className={`flex items-center gap-1 px-3 py-2 border-b-2 whitespace-nowrap select-none cursor-grab transition-colors ${
+        isActive
+          ? 'border-primary text-primary'
+          : 'border-transparent text-muted-foreground hover:text-foreground'
+      } ${isDragging ? 'opacity-40' : ''}`}
       {...attributes}
       {...listeners}
       onClick={onClick}
     >
-      <Typography sx={{ fontSize: 20, fontWeight: isActive ? 700 : 400 }}>{label}</Typography>
+      <span className={`text-xl ${isActive ? 'font-bold' : 'font-normal'}`}>{label}</span>
+
       {isActive && (
-        <>
-          <IconButton
-            size="small"
-            sx={{ color: '#666', p: 0.2, ml: 0.5, '&:hover': { color: 'text.primary' } }}
-            onClick={openMenu}
-            onPointerDown={(e) => e.stopPropagation()}
-          >
-            <MenuIcon sx={{ fontSize: 16 }} />
-          </IconButton>
-          <Menu
-            anchorEl={menuAnchor}
-            open={Boolean(menuAnchor)}
-            onClose={closeMenu}
+        <DropdownMenu open={open} onOpenChange={setOpen}>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="text-muted-foreground hover:text-foreground ml-1 p-0.5 rounded"
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <Menu className="h-4 w-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            className="min-w-[140px]"
             onClick={(e) => e.stopPropagation()}
-            slotProps={{ paper: { sx: { minWidth: 140 } } }}
           >
-            <MenuItem onClick={() => { closeMenu(); onEditRequest() }}>
-              <ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>
-              <ListItemText>Rename</ListItemText>
-            </MenuItem>
-            <MenuItem onClick={() => { closeMenu(); onDelete() }} sx={{ color: 'error.main' }}>
-              <ListItemIcon><DeleteIcon fontSize="small" color="error" /></ListItemIcon>
-              <ListItemText>Delete</ListItemText>
-            </MenuItem>
-          </Menu>
-        </>
+            <DropdownMenuItem
+              className="gap-2"
+              onClick={() => { setOpen(false); onEditRequest() }}
+            >
+              <Pencil className="h-4 w-4" />
+              Rename
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="gap-2 text-destructive focus:text-destructive"
+              onClick={() => { setOpen(false); onDelete() }}
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       )}
-    </Box>
+    </div>
   )
 }
 
@@ -106,8 +101,7 @@ export default function SortableWatchlistTabs({ watchlists, activeIndex, onTabCh
     if (!over || active.id === over.id) return
     const oldIndex = watchlists.findIndex((w) => w.id === active.id)
     const newIndex = watchlists.findIndex((w) => w.id === over.id)
-    const reordered = arrayMove(watchlists, oldIndex, newIndex)
-    onReorder(reordered)
+    onReorder(arrayMove(watchlists, oldIndex, newIndex))
   }
 
   const fixedWatchlists = watchlists.filter((w) => w.is_default)
@@ -121,7 +115,7 @@ export default function SortableWatchlistTabs({ watchlists, activeIndex, onTabCh
       onDragStart={({ active }) => setDraggingId(active.id)}
       onDragEnd={handleDragEnd}
     >
-      <Box sx={{ display: 'flex', overflowX: 'auto', borderBottom: 1, borderColor: 'divider' }}>
+      <div className="flex overflow-x-auto border-b border-border">
         {fixedWatchlists.map((wl) => {
           const index = watchlists.findIndex((w) => w.id === wl.id)
           return (
@@ -149,12 +143,12 @@ export default function SortableWatchlistTabs({ watchlists, activeIndex, onTabCh
             )
           })}
         </SortableContext>
-      </Box>
+      </div>
       <DragOverlay>
         {draggingWatchlist && (
-          <Box sx={{ px: 2, py: 1, bgcolor: '#2a2a2a', borderRadius: 1, boxShadow: 4 }}>
-            <Typography sx={{ fontSize: 20 }}>{draggingWatchlist.name}</Typography>
-          </Box>
+          <div className="px-4 py-2 bg-secondary rounded shadow-lg">
+            <span className="text-xl">{draggingWatchlist.name}</span>
+          </div>
         )}
       </DragOverlay>
     </DndContext>
