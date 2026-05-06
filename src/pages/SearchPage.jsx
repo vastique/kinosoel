@@ -124,7 +124,7 @@ export default function SearchPage() {
         overview: m.overview || null,
       }))
       setMovies(normalized)
-      setTotalPages(Math.min(Math.ceil(page1.total_pages / 2), 10))
+      setTotalPages(Math.min(Math.ceil(page1.total_pages / 2), 250))
       fetchRtScores(normalized)
     } catch (err) {
       console.error(err)
@@ -197,6 +197,17 @@ export default function SearchPage() {
   ]
 
   const currentSortLabel = sortOptions.find((o) => o.value === sortBy)?.label
+
+  const pageItems = useMemo(() => {
+    const items = new Set([1, totalPages, page, page - 1, page + 1, page - 2, page + 2])
+    const sorted = [...items].filter((p) => p >= 1 && p <= totalPages).sort((a, b) => a - b)
+    const out = []
+    for (let i = 0; i < sorted.length; i++) {
+      if (i > 0 && sorted[i] - sorted[i - 1] > 1) out.push(`gap-${i}`)
+      out.push(sorted[i])
+    }
+    return out
+  }, [page, totalPages])
 
   return (
     <div className="p-1.5 sm:p-6">
@@ -315,17 +326,21 @@ export default function SearchPage() {
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-              <Button
-                key={p}
-                variant={p === page ? 'default' : 'ghost'}
-                size="icon"
-                onClick={() => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
-                className="w-9 h-9"
-              >
-                {p}
-              </Button>
-            ))}
+            {pageItems.map((p) =>
+              typeof p === 'number' ? (
+                <Button
+                  key={p}
+                  variant={p === page ? 'default' : 'ghost'}
+                  size="icon"
+                  onClick={() => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+                  className="w-9 h-9"
+                >
+                  {p}
+                </Button>
+              ) : (
+                <span key={p} className="px-1 text-muted-foreground select-none">…</span>
+              )
+            )}
             <Button
               variant="outline"
               size="icon"
